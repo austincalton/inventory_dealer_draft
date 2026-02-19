@@ -6,11 +6,28 @@ const RAILS_URL = 'http://cf.local.gosokal.com:3000';
 const OUTPUT_DIR = path.join(__dirname, '../public/component-previews');
 const ALLOWED_COMPONENTS_PATH = path.join(__dirname, '../src/config/allowedComponents.js');
 const RAILS_API_URL = `${RAILS_URL}/api/components`;
+const COMPONENT_PADDING_CONFIG = require('./component-padding-config.js');
 
 const VIEWPORT = { width: 1200, height: 675 };
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
 const LOAD_TIMEOUT_MS = 10000;
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const forceFlag = args.includes('--force') || args.includes('-f');
+
+if (forceFlag) {
+  console.log('🔄 Force mode enabled - will regenerate all screenshots');
+  
+  if (fs.existsSync(OUTPUT_DIR)) {
+    const existingPngs = fs.readdirSync(OUTPUT_DIR).filter(f => f.endsWith('.png'));
+    for (const file of existingPngs) {
+      fs.unlinkSync(path.join(OUTPUT_DIR, file));
+    }
+    console.log(`  Deleted ${existingPngs.length} existing screenshots`);
+  }
+}
 
 async function readAllowedComponents() {
   const content = fs.readFileSync(ALLOWED_COMPONENTS_PATH, 'utf-8');
@@ -72,6 +89,15 @@ async function takeScreenshot(browser, componentId, section, attempt = 1) {
   const url = buildPreviewUrl(componentId, section);
   const outputPath = path.join(OUTPUT_DIR, `${componentId}.png`);
   
+  let wrapperSelector;
+  if (section === 'navigation') {
+    wrapperSelector = '.component-wrapper[data-component-type="navigation"]';
+  } else if (section === 'footer') {
+    wrapperSelector = '.component-wrapper[data-component-type="footer"]';
+  } else {
+    wrapperSelector = `.component-wrapper[data-component-id="${componentId}"]`;
+  }
+  
   const context = await browser.newContext({
     viewport: VIEWPORT
   });
@@ -88,10 +114,21 @@ async function takeScreenshot(browser, componentId, section, attempt = 1) {
     
     await page.waitForTimeout(1000);
     
-    await page.screenshot({
-      path: outputPath,
-      fullPage: false
-    });
+    // Apply custom padding if configured
+    const paddingConfig = COMPONENT_PADDING_CONFIG[componentId];
+    if (paddingConfig) {
+      const element = page.locator(wrapperSelector);
+      await element.evaluate((el, config) => {
+        if (config.paddingBottom) el.style.paddingBottom = config.paddingBottom;
+        if (config.padding) el.style.padding = config.padding;
+        if (config.margin) el.style.margin = config.margin;
+      }, paddingConfig);
+      console.log(`    Applied custom padding: ${JSON.stringify(paddingConfig)}`);
+    }
+    
+    // Target the component wrapper element to capture only the content without whitespace
+    const element = page.locator(wrapperSelector);
+    await element.screenshot({ path: outputPath });
     
     await context.close();
     return { success: true, path: outputPath };
@@ -158,16 +195,22 @@ async function main() {
   const existingFiles = fs.readdirSync(OUTPUT_DIR)
     .filter(f => f.endsWith('.png'))
     .map(f => f.replace('.png', ''));
+
+  let componentsNeedingScreenshots = componentsToScreenshot;
+
+  if (!forceFlag) {
+    console.log(`  Already have ${existingFiles.length} screenshots`);
+    
+    componentsNeedingScreenshots = componentsToScreenshot.filter(
+      c => !existingFiles.includes(String(c.id))
+    );
+    
+    console.log(`  Need to generate ${componentsNeedingScreenshots.length} new screenshots`);
+  } else {
+    console.log(`  Will regenerate all ${componentsToScreenshot.length} screenshots (force mode)`);
+  }
   
-  console.log(`  Already have ${existingFiles.length} screenshots`);
-  
-  const componentsNeedingScreenshots = componentsToScreenshot.filter(
-    c => !existingFiles.includes(String(c.id))
-  );
-  
-  console.log(`  Need to generate ${componentsNeedingScreenshots.length} new screenshots`);
-  
-  if (componentsNeedingScreenshots.length === 0) {
+  if (componentsNeedingScreenshots.length === 0 && !forceFlag) {
     console.log('\n[4/4] All screenshots already exist. Done!');
     return;
   }
