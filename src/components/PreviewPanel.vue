@@ -115,10 +115,6 @@ const hasAnySelections = computed(() => store.selectedComponents.length > 0)
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin-bottom: 0;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 8px;
 }
 
 .component-wrapper:last-child {
