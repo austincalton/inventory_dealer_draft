@@ -16,6 +16,28 @@ const LOAD_TIMEOUT_MS = 10000;
 // Parse command line arguments
 const args = process.argv.slice(2);
 const forceFlag = args.includes('--force') || args.includes('-f');
+const configOnlyFlag = args.includes('--config') || args.includes('-c');
+
+// Show help
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`
+Usage: node generate-screenshots.js [options]
+
+Options:
+  --force, -f      Force regeneration of all screenshots
+  --config, -c     Only process components with custom config (padding, css, etc.)
+  --help, -h       Show this help message
+
+Examples:
+  node generate-screenshots.js           # Normal run (skip existing)
+  node generate-screenshots.js --force    # Regenerate all
+  node generate-screenshots.js --config   # Only configured components
+  `);
+  process.exit(0);
+}
+
+// Get component IDs that have custom config
+const configuredComponentIds = Object.keys(COMPONENT_PADDING_CONFIG).map(id => parseInt(id));
 
 if (forceFlag) {
   console.log('🔄 Force mode enabled - will regenerate all screenshots');
@@ -124,6 +146,12 @@ async function takeScreenshot(browser, componentId, section, attempt = 1) {
         if (config.margin) el.style.margin = config.margin;
       }, paddingConfig);
       console.log(`    Applied custom padding: ${JSON.stringify(paddingConfig)}`);
+      
+      // Apply custom CSS if configured
+      if (paddingConfig.css) {
+        await page.addStyleTag({ content: paddingConfig.css });
+        console.log(`    Applied custom CSS`);
+      }
     }
     
     // Target the component wrapper element to capture only the content without whitespace
@@ -191,26 +219,48 @@ async function main() {
   }
   
   console.log(`\n[3/4] Found ${componentsToScreenshot.length} components to process`);
-  
+
+  // Get existing files list (used in multiple modes)
   const existingFiles = fs.readdirSync(OUTPUT_DIR)
     .filter(f => f.endsWith('.png'))
     .map(f => f.replace('.png', ''));
 
+  // Filter to only configured components if --config flag is set
   let componentsNeedingScreenshots = componentsToScreenshot;
-
-  if (!forceFlag) {
-    console.log(`  Already have ${existingFiles.length} screenshots`);
+  
+  if (configOnlyFlag) {
+    console.log(`🔧 Config-only mode - only processing ${configuredComponentIds.length} configured components`);
+    
+    // Delete existing screenshots for configured components
+    if (fs.existsSync(OUTPUT_DIR)) {
+      for (const id of configuredComponentIds) {
+        const filePath = path.join(OUTPUT_DIR, `${id}.png`);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+    }
     
     componentsNeedingScreenshots = componentsToScreenshot.filter(
-      c => !existingFiles.includes(String(c.id))
+      c => configuredComponentIds.includes(c.id)
     );
     
-    console.log(`  Need to generate ${componentsNeedingScreenshots.length} new screenshots`);
+    console.log(`  Will regenerate ${componentsNeedingScreenshots.length} configured components`);
   } else {
-    console.log(`  Will regenerate all ${componentsToScreenshot.length} screenshots (force mode)`);
+    if (!forceFlag) {
+      console.log(`  Already have ${existingFiles.length} screenshots`);
+      
+      componentsNeedingScreenshots = componentsToScreenshot.filter(
+        c => !existingFiles.includes(String(c.id))
+      );
+      
+      console.log(`  Need to generate ${componentsNeedingScreenshots.length} new screenshots`);
+    } else {
+      console.log(`  Will regenerate all ${componentsToScreenshot.length} screenshots (force mode)`);
+    }
   }
   
-  if (componentsNeedingScreenshots.length === 0 && !forceFlag) {
+  if (componentsNeedingScreenshots.length === 0 && !forceFlag && !configOnlyFlag) {
     console.log('\n[4/4] All screenshots already exist. Done!');
     return;
   }
@@ -224,9 +274,8 @@ async function main() {
   let skipCount = 0;
   
   for (const component of componentsNeedingScreenshots) {
-    const existingFile = `${component.id}.png`;
-    
-    if (existingFiles.includes(String(component.id))) {
+    // Skip existing files only in non-force, non-config mode
+    if (!configOnlyFlag && !forceFlag && existingFiles.includes(String(component.id))) {
       console.log(`  SKIP: ${component.id} - ${component.name} (already exists)`);
       skipCount++;
       continue;
