@@ -2,7 +2,7 @@
   <div class="app-container">
     <header class="app-header">
       <div class="header-left">
-        <h1 class="page-title">Component Builder</h1>
+        <img class="dealerdraft-logo" :src="imagePath('Dealer-Draft_logo.png')" alt="Component Builder" />
       </div>
       <div class="header-center">
         <div class="section-tabs">
@@ -36,21 +36,29 @@
     </header>
 
     <main class="main-content">
-      <div class="components-panel">
-        <h2 class="section-title">{{ store.sectionTitle }}</h2>
-        <div class="component-grid" v-if="store.currentComponents.length">
-          <ComponentCard
-            v-for="comp in store.currentComponents"
-            :key="comp.id"
-            :component="comp"
-          />
-        </div>
-        <div v-else class="no-components">
-          No components available for this section
+      <div class="components-panel" ref="gridPanel">
+        <div
+          v-for="section in store.sections"
+          :key="section"
+          class="section-content"
+          :class="[`section-content--${section}`, { active: store.currentSection === section }]"
+        >
+          <h2 class="section-title">{{ getSectionLabel(section) }}</h2>
+          <div v-if="store.components[section].length" class="dealerdraft-component-previews" style="--dealerdraft-container-width: 500;">
+            <ComponentCard
+              v-for="comp in store.components[section]"
+              :key="comp.id"
+              :component="comp"
+              @click="updatePreviewFrameWidth"
+            />
+          </div>
+          <div v-else class="no-components">
+            No components available for this section
+          </div>
         </div>
       </div>
 
-      <aside class="preview-panel">
+      <aside ref="componentsPanel">
         <PreviewPanel />
       </aside>
     </main>
@@ -58,13 +66,15 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { ref, onMounted, nextTick, watch, onBeforeUnmount } from 'vue'
 import { useBuilderStore } from './stores/builderStore'
 import { allowedComponents } from './config/allowedComponents'
 import ComponentCard from './components/ComponentCard.vue'
 import PreviewPanel from './components/PreviewPanel.vue'
 
 const store = useBuilderStore()
+
+const imagePath = (suffix) => `${new URL(import.meta.url).origin}${import.meta.env.BASE_URL}${suffix}`
 
 const getSectionLabel = (section) => {
   const labels = {
@@ -75,25 +85,94 @@ const getSectionLabel = (section) => {
   return labels[section] || section
 }
 
+const gridPanel = ref(null)
+const componentsPanel = ref(null)
+let observer
+
+function updateWidth() {
+  const grid = gridPanel.value.querySelector('.section-content.active .dealerdraft-component-previews')
+  if (grid) {
+    const firstCard = grid.querySelector('.dealerdraft-cp-card')
+    if (firstCard) {
+      const width = firstCard.getBoundingClientRect().width
+      grid.style.setProperty('--dealerdraft-container-width', width)
+    }
+  }
+}
+
+function updatePreviewFrameWidth() {
+  const previewPanel = componentsPanel.value
+  if (previewPanel) {
+    const firstFrame = previewPanel.querySelector('.component-frame')
+    if (firstFrame) {
+      const width = firstFrame.getBoundingClientRect().width
+      previewPanel.style.setProperty('--dealerdraft-container-width', width)
+    }
+  }
+}
+
+function setupResizeTracking() {
+  if (observer) observer.disconnect()
+  const targets = []
+
+  const grid = gridPanel.value.querySelector('.section-content.active')
+  if (grid) {
+    const firstCard = grid.querySelector('.dealerdraft-cp-card')
+    if (firstCard) targets.push(firstCard)
+  }
+
+  const previewPanel = componentsPanel.value?.parentElement?.querySelector('.preview-panel')
+  if (previewPanel) {
+    const firstFrame = previewPanel.querySelector('.component-frame')
+    if (firstFrame) targets.push(firstFrame)
+  }
+
+  if (!targets.length) return
+  observer = new ResizeObserver(() => { updateWidth() })
+  targets.forEach(t => observer.observe(t))
+}
+
+watch(() => store.currentSection, async () => {
+  await nextTick()
+  updateWidth()
+  setupResizeTracking()
+})
+
+watch(
+  () => store.selectedComponents,
+  async () => {
+    await nextTick()
+    updatePreviewFrameWidth()
+  },
+  { deep: true }
+)
+
 onMounted(async () => {
   try {
-    const response = await fetch('http://cf.local.gosokal.com:3000/api/components')
+    const response = await fetch('/ajax/available_website_components', {
+      credentials: 'same-origin' // important for Rails cookies/auth
+    })
     const data = await response.json()
 
-    store.setComponents('navigation', 
-      data.navigation.filter(c => allowedComponents.navigation.includes(c.name))
-    )
-    store.setComponents('home_page', 
-      data.home_page.filter(c => allowedComponents.home_page.includes(c.name))
-    )
-    store.setComponents('footer', 
-      data.footer.filter(c => allowedComponents.footer.includes(c.name))
-    )
+    const componentTypes = ['navigation', 'home_page', 'footer']
+    
+    for (const type of componentTypes) {
+      store.setComponents(type, 
+        data[type].filter(c => allowedComponents[type].includes(c.name))
+      )
+    }
 
-    console.log('Components loaded:', data)
+    await nextTick(); // ensures DOM is painted
+    updateWidth();
+    setupResizeTracking();
+    window.dispatchEvent(new Event('dealerdraft-previews-available'));
   } catch (error) {
     console.error('Error fetching components:', error)
   }
+})
+
+onBeforeUnmount(() => {
+  if (observer) observer.disconnect()
 })
 </script>
 
@@ -122,6 +201,11 @@ onMounted(async () => {
 
 .header-left {
   flex: 1;
+}
+
+.dealerdraft-logo {
+  width: 100%;
+  max-width: 200px;
 }
 
 .page-title {
@@ -216,16 +300,18 @@ onMounted(async () => {
   min-width: 0;
 }
 
+.section-content {
+  display: none;
+}
+
+.section-content.active {
+  display: block;
+}
+
 .section-title {
   font-size: 22px;
   margin: 0 0 20px;
   color: #111827;
-}
-
-.component-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 20px;
 }
 
 .preview-panel {
@@ -241,4 +327,14 @@ onMounted(async () => {
   border-radius: 8px;
   border: 1px solid #e5e7eb;
 }
+
+/* New Stuff */
+
+.dealerdraft-component-previews {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: auto;
+  gap: 1em;
+}
+
 </style>

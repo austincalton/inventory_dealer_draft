@@ -4,45 +4,32 @@
     :class="{ selected: isSelected }"
     @click="toggleSelection"
   >
-    <h5 class="card-title">{{ component.name }}</h5>
-
-    <div class="card-preview">
-      <img 
-        :src="screenshotUrl" 
-        :alt="component.name"
-        class="component-image"
-        @error="handleImageError"
-      />
-      <div v-if="imageFailed" class="fallback">
-        {{ component.name }}
+    <div class="dealerdraft-cp-card">
+      <h5 class="card-title">{{ component.name }}</h5>
+      <div class="card-preview dealerdraft-cp-card__container sokal-mx-auto sokal-w-full">
+        <PreviewIframe :component="component" sequential />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useBuilderStore } from '../stores/builderStore'
+import PreviewIframe from './PreviewIframe.vue'
 
 const props = defineProps({
   component: Object
 })
 
 const store = useBuilderStore()
-const imageFailed = ref(false)
 
 const isSelected = computed(() => store.isSelected(props.component))
-
-const screenshotUrl = computed(() => `${import.meta.env.BASE_URL}component-previews/${props.component.id}.png`)
-
-const handleImageError = (e) => {
-  e.target.style.display = 'none'
-  imageFailed.value = true
-}
 
 const toggleSelection = () => {
   store.toggleComponent(props.component)
 }
+
 </script>
 
 <style scoped>
@@ -73,29 +60,10 @@ const toggleSelection = () => {
   color: #111827;
 }
 
-.card-preview {
-  width: 100%;
+/* New Stuff */
+
+.dealerdraft-cp-card .dealerdraft-cp-card__container {
+  pointer-events: none !important;
 }
 
-.component-image {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 4px;
-}
-
-.fallback {
-  width: 100%;
-  aspect-ratio: 16/9;
-  background: #f3f4f6;
-  border: 1px dashed #d1d5db;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: #6b7280;
-  text-align: center;
-  padding: 8px;
-}
 </style>
