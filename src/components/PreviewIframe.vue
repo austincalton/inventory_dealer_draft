@@ -3,15 +3,9 @@
     <iframe
       v-if="component"
       :data-src="iframeUrl"
+      @error="handlePreviewError"
     ></iframe>
-    <!-- <img 
-      v-if="component"
-      :src="screenshotUrl" 
-      :alt="component.name"
-      class="component-image"
-      @error="handleImageError"
-    /> -->
-    <div v-if="component && imageFailed" class="fallback">
+    <div v-if="component && previewFailed" class="fallback">
       {{ component.name }}
     </div>
   </div>
@@ -28,19 +22,20 @@ const props = defineProps({
   }
 })
 
-const imageFailed = ref(false)
+const previewFailed = ref(false)
 
 const screenshotUrl = computed(() => `${import.meta.env.BASE_URL}component-previews/${props.component.id}.png`)
 
-const handleImageError = (e) => {
+const handlePreviewError = (e) => {
   e.target.style.display = 'none'
-  imageFailed.value = true
+  previewFailed.value = true
 }
 
 // Latest
 const componentParamValue = `[[%22id_${props.component.id}%22,1]]`;
 const componentParams = { navigation: `order_nav=${componentParamValue}&order=[]&order_footer=[]`, home_page: `order_nav=[]&order=${componentParamValue}&order_footer=[]`, footer: `order_nav=[]&order=[]&order_footer=${componentParamValue}` };
 const iframeUrl = `/ajax/dealerdraft_preview?${componentParams[props.component.component_type]}`;
+
 </script>
 
 <style scoped>

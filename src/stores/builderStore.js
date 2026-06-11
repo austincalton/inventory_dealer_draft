@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia'
-import { resetAllSections } from '../composables/useSequentialLoad'
 
 export const useBuilderStore = defineStore('builder', {
   state: () => ({
@@ -50,7 +49,6 @@ export const useBuilderStore = defineStore('builder', {
       return this.selectedComponents.some(c => c.id === component.id)
     },
     switchSection(newSection) {
-      resetAllSections()
       this.currentSection = newSection
     },
     nextSection() {

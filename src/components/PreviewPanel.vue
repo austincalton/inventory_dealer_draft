@@ -145,17 +145,6 @@ const hasAnySelections = computed(() => store.selectedComponents.length > 0)
   min-width: 0;
 }
 
-/* .component-frame :deep(.dealerdraft-cp-card__frame-container) {
-  width: 100%;
-  height: auto;
-}
-
-.component-frame :deep(.iframe-preview) {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 16/9;
-} */
-
 .ghost {
   opacity: 0.5;
   background: #e5e7eb;
@@ -167,4 +156,5 @@ const hasAnySelections = computed(() => store.selectedComponents.length > 0)
   text-align: center;
   padding: 40px 0;
 }
+
 </style>

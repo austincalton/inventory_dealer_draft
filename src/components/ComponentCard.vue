@@ -8,7 +8,7 @@
       <h5 class="card-title">{{ component.name }}</h5>
       <div class="card-preview dealerdraft-cp-card__container sokal-mx-auto sokal-w-full">
         <!-- To-do: Add util classes for padding-top (less padding if it's a nav component) -->
-        <div class="sokal-media-container">
+        <div class="sokal-media-container preview-media-container">
           <div class="dealerdraft-cp-card__frame-container sokal-media-cover">
             <iframe
               v-if="iframeReady"
@@ -27,7 +27,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useBuilderStore } from '../stores/builderStore'
 import { useSequentialLoad } from '../composables/useSequentialLoad'
 
@@ -40,13 +40,21 @@ const mediaFailed = ref(false)
 const iframeReady = ref(false)
 
 const { register, onIframeLoaded } = useSequentialLoad(props.component.component_type)
+let registered = false
 
-onMounted(() => {
-  register(() => {
-    iframeReady.value = true
-  });
-  console.log('Found iframes (Vue JS): ' + document.querySelectorAll('#dealerdraft-component-previews iframe').length);
-})
+watch(
+  () => store.currentSection,
+  (currentSection) => {
+    if (currentSection === props.component.component_type && !registered) {
+      registered = true
+      register(() => {
+        iframeReady.value = true
+      })
+      console.log('Found iframes (Vue JS): ' + document.querySelectorAll('.dealerdraft-component-previews iframe').length)
+    }
+  },
+  { immediate: true }
+)
 
 const isSelected = computed(() => store.isSelected(props.component))
 
