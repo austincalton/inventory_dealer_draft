@@ -2,7 +2,8 @@
   <div class="dealerdraft-cp-card__frame-container sokal-media-cover">
     <iframe
       v-if="component"
-      :data-src="iframeUrl"
+      class="preview-panel-frame"
+      :src="iframeUrl"
       @error="handlePreviewError"
     ></iframe>
     <div v-if="component && previewFailed" class="fallback">
@@ -63,4 +64,13 @@ const iframeUrl = `/ajax/dealerdraft_preview?${componentParams[props.component.c
   text-align: center;
   padding: 8px;
 }
+
+iframe.preview-panel-frame {
+  width: 1200px;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  transform: scale(calc(var(--dealerdraft-container-width) / 1200));
+  transform-origin: top left;
+}
+
 </style>

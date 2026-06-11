@@ -99,6 +99,7 @@ function updateWidth() {
   if (!firstCard) return
   const width = firstCard.getBoundingClientRect().width
   grid.style.setProperty('--dealerdraft-container-width', width)
+  document.getElementById('app').style.setProperty('--dealerdraft-container-width', width)
 }
 
 function setupResizeTracking() {
