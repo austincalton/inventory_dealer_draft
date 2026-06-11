@@ -1,12 +1,16 @@
 <template>
-  <div class="dealerdraft-cp-card__frame-container">
-    <img 
+  <div class="dealerdraft-cp-card__frame-container sokal-media-cover">
+    <iframe
+      v-if="component"
+      :data-src="iframeUrl"
+    ></iframe>
+    <!-- <img 
       v-if="component"
       :src="screenshotUrl" 
       :alt="component.name"
       class="component-image"
       @error="handleImageError"
-    />
+    /> -->
     <div v-if="component && imageFailed" class="fallback">
       {{ component.name }}
     </div>
@@ -32,6 +36,11 @@ const handleImageError = (e) => {
   e.target.style.display = 'none'
   imageFailed.value = true
 }
+
+// Latest
+const componentParamValue = `[[%22id_${props.component.id}%22,1]]`;
+const componentParams = { navigation: `order_nav=${componentParamValue}&order=[]&order_footer=[]`, home_page: `order_nav=[]&order=${componentParamValue}&order_footer=[]`, footer: `order_nav=[]&order=[]&order_footer=${componentParamValue}` };
+const iframeUrl = `/ajax/dealerdraft_preview?${componentParams[props.component.component_type]}`;
 </script>
 
 <style scoped>

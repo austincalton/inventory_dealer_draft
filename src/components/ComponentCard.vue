@@ -4,45 +4,70 @@
     :class="{ selected: isSelected }"
     @click="toggleSelection"
   >
-    <h5 class="card-title">{{ component.name }}</h5>
-
-    <div class="card-preview">
-      <img 
-        :src="screenshotUrl" 
-        :alt="component.name"
-        class="component-image"
-        @error="handleImageError"
-      />
-      <div v-if="imageFailed" class="fallback">
-        {{ component.name }}
+    <div class="dealerdraft-cp-card">
+      <h5 class="card-title">{{ component.name }}</h5>
+      <div class="card-preview dealerdraft-cp-card__container sokal-mx-auto sokal-w-full">
+        <!-- To-do: Add util classes for padding-top (less padding if it's a nav component) -->
+        <div class="sokal-media-container">
+          <div class="dealerdraft-cp-card__frame-container sokal-media-cover">
+            <iframe
+              v-if="iframeReady"
+              :src="iframeUrl"
+              class="component-image"
+              @load="handleIframeLoad"
+              @error="handleMediaError"
+            ></iframe>
+            <div v-else class="component-image iframe-placeholder"></div>
+          </div>
+        </div>
+        <div v-if="mediaFailed" class="fallback">{{ component.name }}</div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useBuilderStore } from '../stores/builderStore'
+import { useSequentialLoad } from '../composables/useSequentialLoad'
 
 const props = defineProps({
   component: Object
 })
 
 const store = useBuilderStore()
-const imageFailed = ref(false)
+const mediaFailed = ref(false)
+const iframeReady = ref(false)
+
+const { register, onIframeLoaded } = useSequentialLoad(props.component.component_type)
+
+onMounted(() => {
+  register(() => {
+    iframeReady.value = true
+  });
+  console.log('Found iframes (Vue JS): ' + document.querySelectorAll('#dealerdraft-component-previews iframe').length);
+})
 
 const isSelected = computed(() => store.isSelected(props.component))
 
-const screenshotUrl = computed(() => `${import.meta.env.BASE_URL}component-previews/${props.component.id}.png`)
+const handleIframeLoad = () => {
+  onIframeLoaded()
+}
 
-const handleImageError = (e) => {
+const handleMediaError = (e) => {
   e.target.style.display = 'none'
-  imageFailed.value = true
+  mediaFailed.value = true
+  onIframeLoaded()
 }
 
 const toggleSelection = () => {
   store.toggleComponent(props.component)
 }
+
+const componentParamValue = `[[%22id_${props.component.id}%22,1]]`;
+const componentParams = { navigation: `order_nav=${componentParamValue}&order=[]&order_footer=[]`, home_page: `order_nav=[]&order=${componentParamValue}&order_footer=[]`, footer: `order_nav=[]&order=[]&order_footer=${componentParamValue}` };
+const iframeUrl = `/ajax/dealerdraft_preview?${componentParams[props.component.component_type]}`;
+
 </script>
 
 <style scoped>
@@ -73,15 +98,15 @@ const toggleSelection = () => {
   color: #111827;
 }
 
-.card-preview {
-  width: 100%;
-}
-
 .component-image {
   width: 100%;
   height: auto;
   display: block;
   border-radius: 4px;
+}
+
+.iframe-placeholder {
+  aspect-ratio: 16/9;
 }
 
 .fallback {
@@ -98,4 +123,23 @@ const toggleSelection = () => {
   text-align: center;
   padding: 8px;
 }
+
+/* New Stuff */
+
+.dealerdraft-cp-card .dealerdraft-cp-card__container {
+  pointer-events: none !important;
+}
+
+.dealerdraft-cp-card__frame-container {
+  overflow: hidden;
+}
+
+.dealerdraft-cp-card__frame-container iframe {
+  width: 1200px;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  transform: scale(calc(var(--dealerdraft-container-width) / 1200));
+  transform-origin: top left;
+}
+
 </style>

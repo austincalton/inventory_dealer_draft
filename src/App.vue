@@ -38,7 +38,7 @@
     <main class="main-content">
       <div class="components-panel">
         <h2 class="section-title">{{ store.sectionTitle }}</h2>
-        <div class="component-grid" v-if="store.currentComponents.length">
+        <div id="dealerdraft-component-previews" class="component-grid-OFF" v-if="store.currentComponents.length" style="--dealerdraft-container-width: 500;" ref="previews">
           <ComponentCard
             v-for="comp in store.currentComponents"
             :key="comp.id"
@@ -58,7 +58,8 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+// import { onMounted } from 'vue'
+import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue';
 import { useBuilderStore } from './stores/builderStore'
 import { allowedComponents } from './config/allowedComponents'
 import ComponentCard from './components/ComponentCard.vue'
@@ -75,22 +76,49 @@ const getSectionLabel = (section) => {
   return labels[section] || section
 }
 
+const previews = ref(null);
+
+function updateWidth() {
+  const firstItem = previews.value?.querySelector('.dealerdraft-cp-card');
+  if (!firstItem) return;
+
+  const width = firstItem.getBoundingClientRect().width;
+  previews.value.style.setProperty('--dealerdraft-container-width', width);
+}
+
+let observer;
+
+function setupResizeTracking() {
+  const firstItem = previews.value?.querySelector('.item');
+  if (!firstItem) return;
+
+  observer = new ResizeObserver(() => {
+    updateWidth();
+  });
+
+  observer.observe(firstItem);
+}
+
 onMounted(async () => {
   try {
-    const response = await fetch('http://cf.local.gosokal.com:3000/api/components')
+    const response = await fetch('/ajax/available_website_components', {
+      credentials: 'same-origin' // important for Rails cookies/auth
+    })
     const data = await response.json()
 
-    store.setComponents('navigation', 
-      data.navigation.filter(c => allowedComponents.navigation.includes(c.name))
-    )
-    store.setComponents('home_page', 
-      data.home_page.filter(c => allowedComponents.home_page.includes(c.name))
-    )
-    store.setComponents('footer', 
-      data.footer.filter(c => allowedComponents.footer.includes(c.name))
-    )
+    const componentTypes = ['navigation', 'home_page', 'footer']
+    
+    for (const type of componentTypes) {
+      store.setComponents(type, 
+        data[type].filter(c => allowedComponents[type].includes(c.name))
+      )
+    }
+    console.log('Components loaded:', data);
 
-    console.log('Components loaded:', data)
+    await nextTick(); // ensures DOM is painted
+    updateWidth();
+    setupResizeTracking();
+    window.dispatchEvent(new Event('dealerdraft-previews-available'));
   } catch (error) {
     console.error('Error fetching components:', error)
   }
@@ -241,4 +269,14 @@ onMounted(async () => {
   border-radius: 8px;
   border: 1px solid #e5e7eb;
 }
+
+/* New Stuff */
+
+#dealerdraft-component-previews {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: auto;
+  gap: 1em;
+}
+
 </style>
