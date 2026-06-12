@@ -7,7 +7,6 @@
     <div class="dealerdraft-cp-card">
       <h5 class="card-title">{{ component.name }}</h5>
       <div class="card-preview dealerdraft-cp-card__container sokal-mx-auto sokal-w-full">
-        <!-- To-do: Add util classes for padding-top (less padding if it's a nav component) -->
         <div class="sokal-media-container preview-media-container">
           <div class="dealerdraft-cp-card__frame-container sokal-media-cover">
             <iframe
@@ -50,7 +49,6 @@ watch(
       register(() => {
         iframeReady.value = true
       })
-      console.log('Found iframes (Vue JS): ' + document.querySelectorAll('.dealerdraft-component-previews iframe').length)
     }
   },
   { immediate: true }

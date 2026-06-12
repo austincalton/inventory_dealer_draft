@@ -36,7 +36,7 @@
     </header>
 
     <main class="main-content">
-      <div class="components-panel" ref="componentsPanel">
+      <div class="components-panel" ref="gridPanel">
         <div
           v-for="section in store.sections"
           :key="section"
@@ -49,6 +49,7 @@
               v-for="comp in store.components[section]"
               :key="comp.id"
               :component="comp"
+              @click="updatePreviewFrameWidth"
             />
           </div>
           <div v-else class="no-components">
@@ -57,7 +58,7 @@
         </div>
       </div>
 
-      <aside class="preview-panel">
+      <aside ref="componentsPanel">
         <PreviewPanel />
       </aside>
     </main>
@@ -84,32 +85,51 @@ const getSectionLabel = (section) => {
   return labels[section] || section
 }
 
+const gridPanel = ref(null)
 const componentsPanel = ref(null)
 let observer
 
-function getActiveGrid() {
-  if (!componentsPanel.value) return null
-  return componentsPanel.value.querySelector('.section-content.active .dealerdraft-component-previews')
+function updateWidth() {
+  const grid = gridPanel.value.querySelector('.section-content.active .dealerdraft-component-previews')
+  if (grid) {
+    const firstCard = grid.querySelector('.dealerdraft-cp-card')
+    if (firstCard) {
+      const width = firstCard.getBoundingClientRect().width
+      grid.style.setProperty('--dealerdraft-container-width', width)
+    }
+  }
 }
 
-function updateWidth() {
-  const grid = getActiveGrid()
-  if (!grid) return
-  const firstCard = grid.querySelector('.dealerdraft-cp-card')
-  if (!firstCard) return
-  const width = firstCard.getBoundingClientRect().width
-  grid.style.setProperty('--dealerdraft-container-width', width)
-  document.getElementById('app').style.setProperty('--dealerdraft-container-width', width)
+function updatePreviewFrameWidth() {
+  const previewPanel = componentsPanel.value
+  if (previewPanel) {
+    const firstFrame = previewPanel.querySelector('.component-frame')
+    if (firstFrame) {
+      const width = firstFrame.getBoundingClientRect().width
+      previewPanel.style.setProperty('--dealerdraft-container-width', width)
+    }
+  }
 }
 
 function setupResizeTracking() {
   if (observer) observer.disconnect()
-  const grid = getActiveGrid()
-  if (!grid) return
-  const firstCard = grid.querySelector('.dealerdraft-cp-card')
-  if (!firstCard) return
+  const targets = []
+
+  const grid = gridPanel.value.querySelector('.section-content.active')
+  if (grid) {
+    const firstCard = grid.querySelector('.dealerdraft-cp-card')
+    if (firstCard) targets.push(firstCard)
+  }
+
+  const previewPanel = componentsPanel.value?.parentElement?.querySelector('.preview-panel')
+  if (previewPanel) {
+    const firstFrame = previewPanel.querySelector('.component-frame')
+    if (firstFrame) targets.push(firstFrame)
+  }
+
+  if (!targets.length) return
   observer = new ResizeObserver(() => { updateWidth() })
-  observer.observe(firstCard)
+  targets.forEach(t => observer.observe(t))
 }
 
 watch(() => store.currentSection, async () => {
@@ -117,6 +137,15 @@ watch(() => store.currentSection, async () => {
   updateWidth()
   setupResizeTracking()
 })
+
+watch(
+  () => store.selectedComponents,
+  async () => {
+    await nextTick()
+    updatePreviewFrameWidth()
+  },
+  { deep: true }
+)
 
 onMounted(async () => {
   try {
@@ -132,7 +161,6 @@ onMounted(async () => {
         data[type].filter(c => allowedComponents[type].includes(c.name))
       )
     }
-    console.log('Components loaded:', data);
 
     await nextTick(); // ensures DOM is painted
     updateWidth();

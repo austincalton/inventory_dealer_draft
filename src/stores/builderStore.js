@@ -10,7 +10,8 @@ export const useBuilderStore = defineStore('builder', {
       home_page: [],
       footer: []
     },
-    selectedComponents: []
+    selectedComponents: [],
+    componentScreenshots: {}
   }),
   getters: {
     currentComponents: (state) => state.components[state.currentSection] || [],
