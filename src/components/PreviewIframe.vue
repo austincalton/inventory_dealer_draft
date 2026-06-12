@@ -1,53 +1,87 @@
 <template>
-  <div class="dealerdraft-cp-card__frame-container sokal-media-cover">
-    <iframe
-      v-if="component"
-      class="preview-panel-frame"
-      :src="iframeUrl"
-      @error="handlePreviewError"
-    ></iframe>
-    <div v-if="component && previewFailed" class="fallback">
-      {{ component.name }}
+  <div class="sokal-media-container preview-media-container" :class="`preview-media-container--${sectionKey}`">
+    <div class="dealerdraft-cp-card__frame-container sokal-media-cover">
+      <iframe
+        v-if="iframeReady"
+        :src="iframeUrl"
+        class="component-image"
+        @load="handleIframeLoad"
+        @error="handleMediaError"
+      ></iframe>
+      <div v-else class="component-image iframe-placeholder"></div>
     </div>
   </div>
+  <div v-if="mediaFailed" class="fallback">{{ component.name }}</div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useBuilderStore } from '../stores/builderStore'
+import { useSequentialLoad } from '../composables/useSequentialLoad'
 
 const props = defineProps({
   component: Object,
-  section: {
-    type: String,
-    required: true
+  sequential: {
+    type: Boolean,
+    default: false
   }
 })
 
-const previewFailed = ref(false)
+const store = useBuilderStore()
+const mediaFailed = ref(false)
+const iframeReady = ref(!props.sequential)
 
-const screenshotUrl = computed(() => `${import.meta.env.BASE_URL}component-previews/${props.component.id}.png`)
+const sectionKey = computed(() => props.component.component_type)
 
-const handlePreviewError = (e) => {
-  e.target.style.display = 'none'
-  previewFailed.value = true
+const { register, onIframeLoaded } = useSequentialLoad(sectionKey.value)
+let registered = false
+
+if (props.sequential) {
+  watch(
+    () => store.currentSection,
+    (currentSection) => {
+      if (currentSection === sectionKey.value && !registered) {
+        registered = true
+        register(() => { iframeReady.value = true })
+      }
+    },
+    { immediate: true }
+  )
 }
 
-// Latest
-const componentParamValue = `[[%22id_${props.component.id}%22,1]]`;
-const componentParams = { navigation: `order_nav=${componentParamValue}&order=[]&order_footer=[]`, home_page: `order_nav=[]&order=${componentParamValue}&order_footer=[]`, footer: `order_nav=[]&order=[]&order_footer=${componentParamValue}` };
-const iframeUrl = `/ajax/dealerdraft_preview?${componentParams[props.component.component_type]}`;
+const handleIframeLoad = () => {
+  if (props.sequential) {
+    onIframeLoaded()
+  }
+}
 
+const handleMediaError = (e) => {
+  e.target.style.display = 'none'
+  mediaFailed.value = true
+  if (props.sequential) {
+    onIframeLoaded()
+  }
+}
+
+const componentParamValue = `[[%22id_${props.component.id}%22,1]]`
+const componentParams = {
+  navigation: `order_nav=${componentParamValue}&order=[]&order_footer=[]`,
+  home_page: `order_nav=[]&order=${componentParamValue}&order_footer=[]`,
+  footer: `order_nav=[]&order=[]&order_footer=${componentParamValue}`
+}
+const iframeUrl = `/ajax/dealerdraft_preview?${componentParams[sectionKey.value]}`
 </script>
 
 <style scoped>
-.dealerdraft-cp-card__frame-container {
-  width: 100%;
-}
-
 .component-image {
   width: 100%;
   height: auto;
   display: block;
+  border-radius: 4px;
+}
+
+.iframe-placeholder {
+  aspect-ratio: 16/9;
 }
 
 .fallback {
@@ -65,7 +99,12 @@ const iframeUrl = `/ajax/dealerdraft_preview?${componentParams[props.component.c
   padding: 8px;
 }
 
-iframe.preview-panel-frame {
+.dealerdraft-cp-card__frame-container {
+  overflow: hidden;
+  width: 100%;
+}
+
+.dealerdraft-cp-card__frame-container iframe.component-image {
   width: 1200px;
   aspect-ratio: 16 / 9;
   border: 0;
@@ -73,4 +112,11 @@ iframe.preview-panel-frame {
   transform-origin: top left;
 }
 
+.preview-media-container {
+  padding-top: 47%;
+}
+
+.preview-media-container--navigation {
+  padding-top: 12%;
+}
 </style>

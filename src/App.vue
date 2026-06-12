@@ -337,12 +337,4 @@ onBeforeUnmount(() => {
   gap: 1em;
 }
 
-.section-content .preview-media-container {
-  padding-top: 47%;
-}
-
-.section-content--navigation .preview-media-container {
-  padding-top: 12%;
-}
-
 </style>
