@@ -2,13 +2,22 @@
   <div class="preview-panel">
     <div class="preview-header">
       <h3 class="preview-title">Preview</h3>
-      <button 
-        class="clear-btn" 
-        @click="store.clearAllSections()"
-        :disabled="!hasAnySelections"
-      >
-        Clear All
-      </button>
+      <div class="header-actions">
+        <button
+          class="view-btn"
+          @click="openView"
+          :disabled="!hasAnySelections"
+        >
+          View
+        </button>
+        <button
+          class="clear-btn"
+          @click="store.clearAllSections()"
+          :disabled="!hasAnySelections"
+        >
+          Clear All
+        </button>
+      </div>
     </div>
     
     <div class="preview-scroll-area">
@@ -54,6 +63,30 @@ const selectedComponents = computed({
 })
 
 const hasAnySelections = computed(() => store.selectedComponents.length > 0)
+
+const viewUrl = computed(() => {
+  const sectionTypes = ['navigation', 'home_page', 'footer']
+  const paramKeys = ['order_nav', 'order', 'order_footer']
+
+  const grouped = sectionTypes.map(() => [])
+
+  for (const comp of store.selectedComponents) {
+    const idx = sectionTypes.indexOf(comp.component_type)
+    if (idx !== -1) {
+      grouped[idx].push(`[%22id_${comp.id}%22,1]`)
+    }
+  }
+
+  const params = grouped.map((vals, i) =>
+    `${paramKeys[i]}=${vals.length ? `[${vals.join(',')}]` : '[]'}`
+  )
+
+  return `/ajax/dealerdraft_preview?${params.join('&')}`
+})
+
+const openView = () => {
+  window.open(viewUrl.value, '_blank')
+}
 </script>
 
 <style scoped>
@@ -81,17 +114,38 @@ const hasAnySelections = computed(() => store.selectedComponents.length > 0)
   margin: 0;
 }
 
+.header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.view-btn,
 .clear-btn {
   padding: 4px 8px;
-  background: #dc3545;
   color: white;
   border: none;
   border-radius: 4px;
   font-size: 12px;
   cursor: pointer;
-  pointer-events: auto;
 }
 
+.view-btn {
+  background: #22c55e;
+}
+
+.view-btn:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.clear-btn {
+  background: #dc3545;
+}
+
+.clear-btn:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.view-btn:disabled,
 .clear-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
